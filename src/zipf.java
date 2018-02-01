@@ -1,7 +1,8 @@
+
+
 import java.util.Random;
 
 public class zipf {
-
 	private Random rnd = new Random(System.currentTimeMillis());
 	private int size;
 	private double skew;
@@ -42,6 +43,7 @@ public class zipf {
 	}
 
 	public static void main(String[] args) {
+
 
 		zipf zipf = new zipf(5, 1);
 		for (int i = 1; i <= 5; i++)

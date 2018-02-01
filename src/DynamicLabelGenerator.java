@@ -7,16 +7,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+
 import java.util.TreeMap;
 
 /**
- * Generate labels per time instant for the given dataset
+ * Generate labels per time instant for given dataset
  * @author ksemer
+ *
  */
 public class DynamicLabelGenerator {
-	
 	// input graph
-	private static String dataset = "graph_100s_100";
+	private static String dataset = "graph_400s_100";
 	
 	// path for labels
 	private static String labels_output = "_label_";

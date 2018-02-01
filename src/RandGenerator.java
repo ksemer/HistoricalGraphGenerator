@@ -39,8 +39,10 @@ public class RandGenerator {
 				System.exit(1);
 			}
 		}
-
-		generate(size, snaps, avgDegree);
+		
+//		for (int i = 100000; i <= 500000; i+=100000) {
+//			generate(i, 100, 3);
+//		}
 	}
 
 	/**
@@ -61,6 +63,7 @@ public class RandGenerator {
 		gen.begin();
 
 		FileWriter w = new FileWriter("graph_" + (size / 1000) + "s_" + snapshots);
+		edges_info = new HashMap<>();
 
 		for (int i = 0; i < size; i++)
 			gen.nextEvents();

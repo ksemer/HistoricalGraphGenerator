@@ -19,42 +19,22 @@ import org.graphstream.graph.implementations.SingleGraph;
 
 public class PrefAttachGenerator {
 
-	private static double percentageOfEdgeChanges;
+	private static int newLinks = 5;
+	private static double percentEdgeChange = 0.1;
 	private static Map<String, List<Integer>> edges_info = new HashMap<>();
 
 	public static void main(String[] args) throws IOException {
 
-		int size = 0, snaps = 0, newLinks = 0;
-
-		if (args.length == 4) {
-
-			try {
-				size = Integer.parseInt(args[0]);
-				snaps = Integer.parseInt(args[1]);
-				newLinks = Integer.parseInt(args[2]);
-				percentageOfEdgeChanges = Double.parseDouble(args[3]);
-			} catch (NumberFormatException e) {
-				System.err.println("Argument" + args[0] + " must be an integer.");
-				System.err.println("Argument" + args[1] + " must be an integer.");
-				System.err.println("Argument" + args[2] + " must be an integer.");
-				System.err.println("Argument" + args[3] + " must be a double.");
-				System.exit(1);
-			}
+		for (int i = 200000; i <= 500000; i += 100000) {
+			generate(i, 100);
 		}
 
-		generate(size, snaps, newLinks);
-
+//		for (int i = 200; i <= 500; i += 100) {
+//			generate(100000, i);
+//		}
 	}
 
-    /**
-	 * Generate graph
-	 * 
-	 * @param size
-	 * @param snapshots
-	 * @param avgD
-	 * @throws IOException
-	 */
-	private static void generate(int size, int snapshots, int newLinks) throws IOException {
+	private static void generate(int size, int snapshots) throws IOException {
 
 		System.out.println("Graph generation started");
 
@@ -120,14 +100,7 @@ public class PrefAttachGenerator {
 
 		w.close();
 	}
-
-	/**
-	 * Add new edges
-	 * 
-	 * @param graph
-	 * @param edgesThatChanged
-	 * @param allEdges
-	 */	
+	
 	private static void addEdges(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges) {
 
 		Random rand = new Random();
@@ -178,63 +151,56 @@ public class PrefAttachGenerator {
 		}
 	}
 
-	
-	// private static void addEdges1(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges, List<Node> nodesOrd) {
+	private static void addEdges1(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges, List<Node> nodesOrd) {
 
-		// Random rand = new Random();
-		// int u;
-		// String e, e1;
-		// String[] token;
-		// Set<String> edges = new HashSet<>();
+		Random rand = new Random();
+		int u;
+		String e, e1;
+		String[] token;
+		Set<String> edges = new HashSet<>();
 
-		// int graphEdges = graph.getEdgeCount();
-		// double maxProb = (double) nodesOrd.get(nodesOrd.size() - 1).getDegree() / (double) graph.getEdgeCount();
+		int graphEdges = graph.getEdgeCount();
+		double maxProb = (double) nodesOrd.get(nodesOrd.size() - 1).getDegree() / (double) graph.getEdgeCount();
 
-		// for (int i = 0; i < edgesThatChanged.size(); i++) {
+		for (int i = 0; i < edgesThatChanged.size(); i++) {
 
-			// u = rand.nextInt(graph.getNodeCount() - 1) + 1;
+			u = rand.nextInt(graph.getNodeCount() - 1) + 1;
 			
-			// double prob = ThreadLocalRandom.current().nextDouble(0,maxProb);
+			double prob = ThreadLocalRandom.current().nextDouble(0,maxProb);
 
-			// int deg = (int) (graphEdges * prob);
-			// boolean added = false;
+			int deg = (int) (graphEdges * prob);
+			boolean added = false;
 
-			// for (Node n : nodesOrd) {
+			for (Node n : nodesOrd) {
 
-				// e = u + "_" + n.getId();
-				// e1 = n.getId() + "_" + u;
+				e = u + "_" + n.getId();
+				e1 = n.getId() + "_" + u;
 
-				// if (n.getDegree() >= deg || n.getId().equals("" + u) || edges.contains(e) || edges.contains(e1)
-						// || edgesThatChanged.contains(e) || edgesThatChanged.contains(e1) || allEdges.contains(e)
-						// || allEdges.contains(e1))
-					// continue;
+				if (n.getDegree() >= deg || n.getId().equals("" + u) || edges.contains(e) || edges.contains(e1)
+						|| edgesThatChanged.contains(e) || edgesThatChanged.contains(e1) || allEdges.contains(e)
+						|| allEdges.contains(e1))
+					continue;
 
-				// edges.add(e);
-				// added = true;
-				// break;
-			// }
+				edges.add(e);
+				added = true;
+				break;
+			}
 
-			// if (!added)
-				// i--;
-		// }
+			if (!added)
+				i--;
+		}
 
-		// for (String e_ : edges) {
-			// token = e_.split("_");
-			// graph.addEdge(e_, token[0], token[1]);
+		for (String e_ : edges) {
+			token = e_.split("_");
+			graph.addEdge(e_, token[0], token[1]);
 
-			// if (edges_info.get(e_) == null)
-				// edges_info.put(e_, new ArrayList<>());
+			if (edges_info.get(e_) == null)
+				edges_info.put(e_, new ArrayList<>());
 
-			// allEdges.add(e_);
-		// }
-	// }
+			allEdges.add(e_);
+		}
+	}
 
-	/**
-	 * Return set of edges u_v existing in the graph
-	 * 
-	 * @param graph
-	 * @return
-	 */
 	private static Set<String> getEdgesToBeChanged(Graph graph) {
 
 		Random rand = new Random();

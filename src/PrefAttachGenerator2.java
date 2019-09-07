@@ -1,14 +1,10 @@
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.graphstream.algorithm.generator.BarabasiAlbertGenerator;
 import org.graphstream.algorithm.generator.Generator;
@@ -19,166 +15,158 @@ import org.graphstream.graph.implementations.SingleGraph;
 
 public class PrefAttachGenerator2 {
 
-	private static int newLinks = 5;
-	private static double percentEdgeChange = 0.10;
-	private static Map<String, List<Integer>> edges_info = new HashMap<>();
+    private static Map<String, List<Integer>> edges_info = new HashMap<>();
+    private static final Logger _logger = Logger.getLogger(PrefAttachGenerator2.class.getName());
 
-	public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException {
 
-		for (int i = 200000; i <= 500000; i += 100000) {
-			generate(i, 100);
-		}
+        for (int i = 200000; i <= 500000; i += 100000) {
+            generate(i, 100);
+        }
 
-		for (int i = 200; i <= 500; i += 100) {
-			generate(100000, i);
-		}
-	}
+        for (int i = 200; i <= 500; i += 100) {
+            generate(100000, i);
+        }
+    }
 
-	private static void generate(int size, int snapshots) throws IOException {
+    private static void generate(int size, int snapshots) throws IOException {
 
-		System.out.println("Graph generation started");
+        _logger.log(Level.INFO, "Graph generation started");
 
-		Graph graph = new SingleGraph("Barabàsi-Albert");
-		Generator gen = new BarabasiAlbertGenerator(newLinks, false);
+        Graph graph = new SingleGraph("Barabàsi-Albert");
+        int newLinks = 5;
+        Generator gen = new BarabasiAlbertGenerator(newLinks, false);
 
-		// Generate nodes size of size:
-		gen.addSink(graph);
-		gen.begin();
+        // Generate nodes size of size:
+        gen.addSink(graph);
+        gen.begin();
 
-		for (int i = 0; i < size; i++) {
-			gen.nextEvents();
-		}
-		gen.end();
-		
-		System.out.println("#nodes: " + graph.getNodeCount() + "\t#edges: " + graph.getEdgeCount());
+        for (int i = 0; i < size; i++) {
+            gen.nextEvents();
+        }
+        gen.end();
 
+        _logger.log(Level.INFO, "#nodes: " + graph.getNodeCount() + "\t#edges: " + graph.getEdgeCount());
 
-		graph.setStrict(false);
-		Set<String> edgesToBeChanged, edgesToBeAdded, allEdges = new HashSet<>();
-		List<Integer> list;
+        graph.setStrict(false);
+        Set<String> edgesToBeChanged, edgesToBeAdded, allEdges = new HashSet<>();
+        List<Integer> list;
+        List<Node> nodesOrd = new ArrayList<>(graph.getNodeSet());
 
-		List<Node> nodesOrd = new ArrayList<>(graph.getNodeSet());
+        for (Edge e : graph.getEachEdge()) {
+            list = new ArrayList<>();
+            list.add(0);
+            edges_info.put(e.getId(), list);
+            allEdges.add(e.getId());
+        }
 
-		for (Edge e : graph.getEachEdge()) {
-			list = new ArrayList<>();
-			list.add(0);
-			edges_info.put(e.getId(), list);
-			allEdges.add(e.getId());
-		}
-		
-		nodesOrd.sort((Node n1, Node n2) -> Integer.compare(n1.getDegree(), n2.getDegree()));
+        nodesOrd.sort(Comparator.comparingInt(Node::getDegree));
 
-		for (int t = 1; t < snapshots; t++) {
+        for (int t = 1; t < snapshots; t++) {
 
-			edgesToBeChanged = getEdgesToBeChanged(graph);
-			edgesToBeAdded = addEdges(graph, edgesToBeChanged, allEdges, nodesOrd);
+            edgesToBeChanged = getEdgesToBeChanged(graph);
+            edgesToBeAdded = addEdges(graph, edgesToBeChanged, allEdges, nodesOrd);
 
-//			for (String e : edgesToBeChanged) {
-//				graph.removeEdge(e);
-//				allEdges.remove(e);
-//			}
+            for (String e : edgesToBeChanged) {
+                graph.removeEdge(e);
+                allEdges.remove(e);
+            }
 
-			for (Edge e : graph.getEachEdge()) {
-				
-				if (edgesToBeChanged.contains(e.getSourceNode() + "_" + e.getTargetNode()) || edgesToBeChanged.contains(e.getTargetNode() + "_" + e.getSourceNode()))
-					continue;
-				edges_info.get(e.getId()).add(t);
-			}
-			
-			for (String e : edgesToBeAdded) {
-				edges_info.get(e).add(t);
-			}
-			
-			System.out.println((t+1) + "/" + snapshots);
-		}
+            for (Edge e : graph.getEachEdge()) {
 
-		String[] token;
-		
-		FileWriter w = new FileWriter("graph_" + (size / 1000) + "s_" + snapshots);
+                if (edgesToBeChanged.contains(e.getSourceNode() + "_" + e.getTargetNode()) || edgesToBeChanged.contains(e.getTargetNode() + "_" + e.getSourceNode()))
+                    continue;
+                edges_info.get(e.getId()).add(t);
+            }
 
+            for (String e : edgesToBeAdded) {
+                edges_info.get(e).add(t);
+            }
 
-		for (Entry<String, List<Integer>> entry : edges_info.entrySet()) {
-			token = entry.getKey().split("_");
-			w.write(token[0] + " " + token[1] + "\t" + entry.getValue() + "\n");
-			w.flush();
-		}
+            _logger.log(Level.INFO, (t + 1) + "/" + snapshots);
+        }
 
-		System.out.println("#nodes: " + graph.getNodeCount() + "\t#edges: " + edges_info.size());
+        String[] token;
 
-		w.close();
-	}
+        FileWriter w = new FileWriter("graph_" + (size / 1000) + "s_" + snapshots);
+        for (Entry<String, List<Integer>> entry : edges_info.entrySet()) {
+            token = entry.getKey().split("_");
+            w.write(token[0] + " " + token[1] + "\t" + entry.getValue() + "\n");
+            w.flush();
+        }
 
-	private static Set<String> addEdges(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges, List<Node> nodesOrd) {
+        _logger.log(Level.INFO, "#nodes: " + graph.getNodeCount() + "\t#edges: " + edges_info.size());
+        w.close();
+    }
 
-		Random rand = new Random();
-		int u;
-		String e, e1;
-		String[] token;
-		Set<String> edges = new HashSet<>();
+    private static Set<String> addEdges(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges, List<Node> nodesOrd) {
 
-		int graphEdges = graph.getEdgeCount();
-		double maxProb = (double) nodesOrd.get(nodesOrd.size() - 1).getDegree() / (double) graph.getEdgeCount();
+        Random rand = new Random();
+        int u;
+        String e, e1;
+        String[] token;
+        Set<String> edges = new HashSet<>();
+        int graphEdges = graph.getEdgeCount();
+        double maxProb = (double) nodesOrd.get(nodesOrd.size() - 1).getDegree() / (double) graph.getEdgeCount();
 
-		for (int i = 0; i < edgesThatChanged.size(); i++) {
+        for (int i = 0; i < edgesThatChanged.size(); i++) {
 
-			u = rand.nextInt(graph.getNodeCount() - 1) + 1;
-			
-			double prob = ThreadLocalRandom.current().nextDouble(0,maxProb);
+            u = rand.nextInt(graph.getNodeCount() - 1) + 1;
 
-			int deg = (int) (graphEdges * prob);
-			boolean added = false;
+            double prob = ThreadLocalRandom.current().nextDouble(0, maxProb);
 
-			for (Node n : nodesOrd) {
+            int deg = (int) (graphEdges * prob);
+            boolean added = false;
 
-				e = u + "_" + n.getId();
-				e1 = n.getId() + "_" + u;
+            for (Node n : nodesOrd) {
 
-				if (n.getDegree() >= deg || n.getId().equals("" + u) || edges.contains(e) || edges.contains(e1)
-						|| edgesThatChanged.contains(e) || edgesThatChanged.contains(e1) || allEdges.contains(e)
-						|| allEdges.contains(e1))
-					continue;
+                e = u + "_" + n.getId();
+                e1 = n.getId() + "_" + u;
 
-				edges.add(e);
-				added = true;
-				break;
-			}
+                if (n.getDegree() >= deg || n.getId().equals("" + u) || edges.contains(e) || edges.contains(e1)
+                        || edgesThatChanged.contains(e) || edgesThatChanged.contains(e1) || allEdges.contains(e)
+                        || allEdges.contains(e1))
+                    continue;
 
-			if (!added)
-				i--;
-		}
+                edges.add(e);
+                added = true;
+                break;
+            }
 
-		for (String e_ : edges) {
-			token = e_.split("_");
-	//		graph.addEdge(e_, token[0], token[1]);
+            if (!added)
+                i--;
+        }
 
-			if (edges_info.get(e_) == null)
-				edges_info.put(e_, new ArrayList<>());
+        for (String e_ : edges) {
+            token = e_.split("_");
+            graph.addEdge(e_, token[0], token[1]);
+            edges_info.computeIfAbsent(e_, k -> new ArrayList<>());
+            allEdges.add(e_);
+        }
 
-		//	allEdges.add(e_);
-		}
-		
-		return edges;
-	}
+        return edges;
+    }
 
-	private static Set<String> getEdgesToBeChanged(Graph graph) {
+    private static Set<String> getEdgesToBeChanged(Graph graph) {
 
-		Random rand = new Random();
+        Random rand = new Random();
 
-		int numOfChanges = (int) (graph.getEdgeCount() * percentEdgeChange);
-		int num;
-		Edge e;
-		Set<String> e_ = new HashSet<>();
+        double percentEdgeChange = 0.10;
+        int numOfChanges = (int) (graph.getEdgeCount() * percentEdgeChange);
+        int num;
+        Edge e;
+        Set<String> e_ = new HashSet<>();
 
-		for (int i = 0; i < numOfChanges; i++) {
-			num = rand.nextInt(graph.getEdgeCount() - 1) + 1;
-			e = graph.getEdge(num);
+        for (int i = 0; i < numOfChanges; i++) {
+            num = rand.nextInt(graph.getEdgeCount() - 1) + 1;
+            e = graph.getEdge(num);
 
-			if (e != null && !e_.contains(e.getId()))
-				e_.add(e.getId());
-			else
-				i--;
-		}
+            if (e != null && !e_.contains(e.getId()))
+                e_.add(e.getId());
+            else
+                i--;
+        }
 
-		return e_;
-	}
+        return e_;
+    }
 }

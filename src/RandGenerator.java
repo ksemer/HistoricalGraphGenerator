@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import org.graphstream.algorithm.generator.Generator;
 import org.graphstream.algorithm.generator.RandomGenerator;
@@ -17,168 +19,149 @@ import org.graphstream.graph.implementations.SingleGraph;
 
 public class RandGenerator {
 
-	private static double percentageOfEdgeChanges;
-	private static Map<String, List<Integer>> edges_info = new HashMap<>();
+    private static double percentageOfEdgeChanges;
+    private static Map<String, List<Integer>> edges_info = new HashMap<>();
+    private static final Logger _logger = Logger.getLogger(RandGenerator.class.getName());
 
-	public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException {
 
-		int size = 0, snaps = 0, avgDegree = 0;
+        int size = 0, snaps = 0, avgDegree = 0;
 
-		if (args.length == 4) {
+        if (args.length == 4) {
 
-			try {
-				size = Integer.parseInt(args[0]);
-				snaps = Integer.parseInt(args[1]);
-				avgDegree = Integer.parseInt(args[2]);
-				percentageOfEdgeChanges = Double.parseDouble(args[3]);
-			} catch (NumberFormatException e) {
-				System.err.println("Argument" + args[0] + " must be an integer.");
-				System.err.println("Argument" + args[1] + " must be an integer.");
-				System.err.println("Argument" + args[2] + " must be an integer.");
-				System.err.println("Argument" + args[3] + " must be a double.");
-				System.exit(1);
-			}
-		}
-		
-//		for (int i = 100000; i <= 500000; i+=100000) {
-//			generate(i, 100, 3);
-//		}
-	}
+            try {
+                size = Integer.parseInt(args[0]);
+                snaps = Integer.parseInt(args[1]);
+                avgDegree = Integer.parseInt(args[2]);
+                percentageOfEdgeChanges = Double.parseDouble(args[3]);
+            } catch (NumberFormatException e) {
+                _logger.log(Level.SEVERE, "Argument" + args[0] + " must be an integer.");
+                _logger.log(Level.SEVERE, "Argument" + args[1] + " must be an integer.");
+                _logger.log(Level.SEVERE, "Argument" + args[2] + " must be an integer.");
+                _logger.log(Level.SEVERE, "Argument" + args[3] + " must be a double.");
+                System.exit(1);
+            }
+        }
 
-	/**
-	 * Generate graph
-	 * 
-	 * @param size
-	 * @param snapshots
-	 * @param avgD
-	 * @throws IOException
-	 */
-	private static void generate(int size, int snapshots, int avgD) throws IOException {
+        for (int i = 100000; i <= 500000; i += 100000) {
+            generate(size, snaps, avgDegree);
+        }
+    }
 
-		System.out.println("Graph generation started");
+    /**
+     * Generate graph
+     */
+    private static void generate(int size, int snapshots, int avgD) throws IOException {
 
-		Graph graph = new SingleGraph("Random");
-		Generator gen = new RandomGenerator(avgD);
-		gen.addSink(graph);
-		gen.begin();
+        _logger.log(Level.INFO, "Graph generation started");
+        Graph graph = new SingleGraph("Random");
+        Generator gen = new RandomGenerator(avgD);
+        gen.addSink(graph);
+        gen.begin();
 
-		FileWriter w = new FileWriter("graph_" + (size / 1000) + "s_" + snapshots);
-		edges_info = new HashMap<>();
+        FileWriter w = new FileWriter("graph_" + (size / 1000) + "s_" + snapshots);
+        edges_info = new HashMap<>();
 
-		for (int i = 0; i < size; i++)
-			gen.nextEvents();
+        for (int i = 0; i < size; i++)
+            gen.nextEvents();
 
-		gen.end();
+        gen.end();
 
-		Set<String> edgesToBeChanged, allEdges = new HashSet<>();
-		List<Integer> list;
+        Set<String> edgesToBeChanged, allEdges = new HashSet<>();
+        List<Integer> list;
 
-		for (Edge e : graph.getEachEdge()) {
-			list = new ArrayList<>();
-			list.add(0);
-			edges_info.put(e.getId(), list);
-			allEdges.add(e.getId());
-		}
+        for (Edge e : graph.getEachEdge()) {
+            list = new ArrayList<>();
+            list.add(0);
+            edges_info.put(e.getId(), list);
+            allEdges.add(e.getId());
+        }
 
-		for (int t = 1; t < snapshots; t++) {
+        for (int t = 1; t < snapshots; t++) {
+            edgesToBeChanged = getEdgesToBeChanged(graph);
+            addEdges(graph, edgesToBeChanged, allEdges);
 
-			edgesToBeChanged = getEdgesToBeChanged(graph);
-			addEdges(graph, edgesToBeChanged, allEdges);
+            for (String e : edgesToBeChanged) {
+                graph.removeEdge(e);
+                allEdges.remove(e);
+            }
 
-			for (String e : edgesToBeChanged) {
-				graph.removeEdge(e);
-				allEdges.remove(e);
-			}
+            for (Edge e : graph.getEachEdge())
+                edges_info.get(e.getId()).add(t);
+        }
 
-			for (Edge e : graph.getEachEdge())
-				edges_info.get(e.getId()).add(t);
-		}
+        String[] token;
+        for (Entry<String, List<Integer>> entry : edges_info.entrySet()) {
+            token = entry.getKey().split("_");
+            w.write(token[0] + " " + token[1] + "\t" + entry.getValue() + "\n");
+            w.flush();
+        }
 
-		String[] token;
+        _logger.log(Level.INFO, "#nodes: " + graph.getNodeCount() + "\t#edges: " + edges_info.size());
+        w.close();
+    }
 
-		for (Entry<String, List<Integer>> entry : edges_info.entrySet()) {
-			token = entry.getKey().split("_");
-			w.write(token[0] + " " + token[1] + "\t" + entry.getValue() + "\n");
-			w.flush();
-		}
+    /**
+     * Add new edges
+     */
+    private static void addEdges(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges) {
 
-		System.out.println("#nodes: " + graph.getNodeCount() + "\t#edges: " + edges_info.size());
+        Random rand = new Random();
+        int u, v;
+        String e;
+        String[] token;
+        Set<String> edges = new HashSet<>();
 
-		w.close();
-	}
+        for (int i = 0; i < edgesThatChanged.size(); i++) {
 
-	/**
-	 * Add new edges
-	 * 
-	 * @param graph
-	 * @param edgesThatChanged
-	 * @param allEdges
-	 */
-	private static void addEdges(Graph graph, Set<String> edgesThatChanged, Set<String> allEdges) {
+            u = rand.nextInt(graph.getNodeCount() - 1) + 1;
+            v = rand.nextInt(graph.getNodeCount() - 1) + 1;
 
-		Random rand = new Random();
-		int u, v;
-		String e;
-		String[] token;
-		Set<String> edges = new HashSet<>();
+            if (u == v) {
+                i--;
+                continue;
+            }
 
-		for (int i = 0; i < edgesThatChanged.size(); i++) {
+            if (u < v)
+                e = u + "_" + v;
+            else
+                e = v + "_" + u;
 
-			u = rand.nextInt(graph.getNodeCount() - 1) + 1;
-			v = rand.nextInt(graph.getNodeCount() - 1) + 1;
+            if (edges.contains(e) || edgesThatChanged.contains(e) || allEdges.contains(e))
+                i--;
+            else
+                edges.add(e);
+        }
 
-			if (u == v) {
-				i--;
-				continue;
-			}
+        for (String e_ : edges) {
+            token = e_.split("_");
+            graph.addEdge(e_, token[0], token[1]);
+            edges_info.computeIfAbsent(e_, k -> new ArrayList<>());
+            allEdges.add(e_);
+        }
+    }
 
-			if (u < v)
-				e = u + "_" + v;
-			else
-				e = v + "_" + u;
+    /**
+     * Return set of edges u_v existing in the graph
+     */
+    private static Set<String> getEdgesToBeChanged(Graph graph) {
 
-			if (edges.contains(e) || edgesThatChanged.contains(e) || allEdges.contains(e))
-				i--;
-			else
-				edges.add(e);
-		}
+        Random rand = new Random();
+        int numOfChanges = (int) (graph.getEdgeCount() * percentageOfEdgeChanges);
+        int num;
+        Edge e;
+        Set<String> e_ = new HashSet<>();
 
-		for (String e_ : edges) {
-			token = e_.split("_");
-			graph.addEdge(e_, token[0], token[1]);
+        for (int i = 0; i < numOfChanges; i++) {
+            num = rand.nextInt(graph.getEdgeCount() - 1) + 1;
+            e = graph.getEdge(num);
 
-			if (edges_info.get(e_) == null)
-				edges_info.put(e_, new ArrayList<>());
+            if (e != null && !e_.contains(e.getId())) {
+                e_.add(e.getId());
+            } else
+                i--;
+        }
 
-			allEdges.add(e_);
-		}
-	}
-
-	/**
-	 * Return set of edges u_v existing in the graph
-	 * 
-	 * @param graph
-	 * @return
-	 */
-	private static Set<String> getEdgesToBeChanged(Graph graph) {
-
-		Random rand = new Random();
-
-		int numOfChanges = (int) (graph.getEdgeCount() * percentageOfEdgeChanges);
-		int num;
-		Edge e;
-		Set<String> e_ = new HashSet<>();
-
-		for (int i = 0; i < numOfChanges; i++) {
-			num = rand.nextInt(graph.getEdgeCount() - 1) + 1;
-			e = graph.getEdge(num);
-
-			if (e != null && !e_.contains(e.getId())) {
-				e_.add(e.getId());
-			} else
-				i--;
-		}
-
-		return e_;
-	}
+        return e_;
+    }
 }
